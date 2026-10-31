@@ -13,7 +13,6 @@
     <!-- Firebase Compat SDKs (Works everywhere including file:// and Preview without CORS module blocks) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
     
     <script>
         tailwind.config = {
@@ -125,9 +124,6 @@
                     </button>
                     <div class="hidden group-hover:block hover:block absolute right-0 mt-1 w-64 rounded-xl bg-white dark:bg-darkCard shadow-xl border border-slate-200 dark:border-darkBorder py-2 z-50">
                         <div class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Firebase Cloud & Backup</div>
-                        <button onclick="toggleAuth()" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-700 dark:text-slate-200">
-                            <i class="fa-brands fa-google w-4"></i> <span id="authMenuText">Entrar com Google</span>
-                        </button>
                         <button onclick="syncLocalToCloud()" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400 font-medium">
                             <i class="fa-solid fa-cloud-arrow-up w-4"></i> Sincronizar Local p/ Nuvem
                         </button>
@@ -461,26 +457,18 @@
                     Estado atual: A verificar ligação...
                 </div>
 
-                <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div id="authAccountBox" class="text-xs">Você não está conectado. Entre para sincronizar entre aparelhos.</div>
-                    <button type="button" id="authModalBtn" onclick="toggleAuth()" class="px-3.5 py-2 rounded-xl bg-white text-slate-800 border border-slate-300 hover:bg-slate-100 text-xs font-semibold transition flex items-center gap-1.5">
-                        <i class="fa-brands fa-google"></i> Entrar com Google
-                    </button>
-                </div>
-
-                <p class="font-semibold text-slate-800 dark:text-slate-100">Como ativar no Firebase Console:</p>
+                <p class="font-semibold text-slate-800 dark:text-slate-100">Como ativar o banco de dados na nuvem (caso apareça "Modo Local / Sem Permissão"):</p>
                 <ol class="list-decimal list-inside space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <li><strong class="text-slate-700 dark:text-slate-200">Firestore Database</strong> &rarr; Criar banco de dados (modo de produção).</li>
-                    <li><strong class="text-slate-700 dark:text-slate-200">Authentication</strong> &rarr; Sign-in method &rarr; ative o provedor <strong>Google</strong>.</li>
-                    <li><strong class="text-slate-700 dark:text-slate-200">Authentication &rarr; Settings &rarr; Authorized domains</strong>: adicione o domínio onde o arquivo está hospedado (localhost já vem). O login não funciona abrindo o arquivo direto (file://).</li>
-                    <li>Firestore &rarr; <strong class="text-slate-700 dark:text-slate-200">Regras</strong>: cole a regra abaixo e publique.</li>
+                    <li>Acesse o <strong class="text-slate-700 dark:text-slate-200">Firebase Console</strong> no projeto <span class="font-mono">organizador-de-tarefas-fadc1</span>.</li>
+                    <li>No menu lateral esquerdo, clique em <strong class="text-slate-700 dark:text-slate-200">Criação (Build) &rarr; Firestore Database</strong> e clique em <strong class="text-slate-700 dark:text-slate-200">Criar banco de dados</strong>.</li>
+                    <li>Selecione <strong class="text-emerald-600 dark:text-emerald-400">Iniciar no modo de teste (Test mode)</strong> ou acesse a aba <strong>Regras (Rules)</strong> e cole a regra abaixo:</li>
                 </ol>
                 <div class="relative">
                     <pre id="firestoreRulesCode" class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-700">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/tarefas/{taskId} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    match /tarefas/{document=**} {
+      allow read, write: if true;
     }
   }
 }</pre>
@@ -570,7 +558,7 @@ service cloud.firestore {
         };
 
         /**************************************************************
-         * 2. FIREBASE (LOGIN GOOGLE + FIRESTORE POR USUÁRIO)
+         * 2. FIREBASE INITIALIZATION & CLOUD SYNC
          **************************************************************/
         const firebaseConfig = {
             apiKey: "AIzaSyCznnDHRTQDX1FjsBJvRmWH9nX6xV9n1C4",
@@ -582,93 +570,34 @@ service cloud.firestore {
             measurementId: "G-PWB2RVTPTJ"
         };
 
-        const LAST_UID_KEY = 'taskflow_last_uid';
-        const SEED_KEY = 'taskflow_seeded_';
-        let db = null, auth = null, currentUser = null, cacheUid = null;
+        let db = null;
         let unsubscribeSnapshot = null;
-
-        function getCacheKey() { return cacheUid ? STORAGE_KEY + ':' + cacheUid : STORAGE_KEY; }
-        function userCol() { return db.collection('users').doc(currentUser.uid).collection('tarefas'); }
-        function cloudReady() { return !!(db && currentUser); }
 
         function initFirebase() {
             if (typeof firebase === 'undefined') {
-                updateCloudStatusUI('offline', 'Scripts do Firebase não carregados (sem internet ou bloqueio de rede).');
+                updateCloudStatusUI('offline', 'Scripts do Firebase não carregados (Sem internet ou bloqueio de rede).');
                 return;
             }
             try {
-                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
                 db = firebase.firestore();
-                auth = firebase.auth();
-                auth.onAuthStateChanged(handleAuthChange);
+                setupFirestoreRealtimeListener();
             } catch (err) {
                 console.warn("Erro na inicialização do Firebase:", err);
                 updateCloudStatusUI('offline', err.message || 'Erro ao inicializar SDK.');
             }
         }
 
-        function handleAuthChange(user) {
-            stopCloudListener();
-            currentUser = user;
-            if (user) {
-                cacheUid = user.uid;
-                localStorage.setItem(LAST_UID_KEY, user.uid);
-                tasks = readTasks(getCacheKey()) || [];
-                renderAll();
-                startCloudListener();
-            } else {
-                localStorage.removeItem(LAST_UID_KEY);
-                loadTasksFromLocalCache();
-                renderAll();
-                updateCloudStatusUI('signedout', 'Entre com sua conta Google para sincronizar suas tarefas na nuvem.');
-            }
-            updateAuthUI();
-        }
-
-        async function signInWithGoogle() {
-            if (!auth) { showToast('Firebase indisponível.', 'error'); return; }
-            try {
-                await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-            } catch (e) {
-                const c = e.code || '';
-                if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return;
-                if (c === 'auth/popup-blocked') { auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); return; }
-                const msgs = {
-                    'auth/unauthorized-domain': 'Domínio não autorizado: adicione-o em Authentication → Settings → Authorized domains.',
-                    'auth/operation-not-allowed': 'Ative o provedor Google em Authentication → Sign-in method.',
-                    'auth/operation-not-supported-in-this-environment': 'O login não funciona com o arquivo aberto direto (file://). Use http(s): Firebase Hosting ou localhost.'
-                };
-                showToast(msgs[c] || ('Falha no login: ' + (e.message || c)), 'error');
-                openFirebaseHelpModal();
-            }
-        }
-
-        function toggleAuth() {
-            if (currentUser) { auth.signOut(); showToast('Sessão encerrada.', 'info'); }
-            else signInWithGoogle();
-        }
-
-        function updateAuthUI() {
-            const menu = document.getElementById('authMenuText');
-            if (menu) menu.textContent = currentUser ? 'Sair (' + (currentUser.email || 'conta') + ')' : 'Entrar com Google';
-            const box = document.getElementById('authAccountBox');
-            if (box) box.innerHTML = currentUser
-                ? 'Conectado como <strong>' + escapeHtml(currentUser.email || currentUser.displayName || '') + '</strong>'
-                : 'Você não está conectado. Entre para sincronizar entre aparelhos.';
-            const btn = document.getElementById('authModalBtn');
-            if (btn) btn.innerHTML = currentUser
-                ? '<i class="fa-solid fa-right-from-bracket"></i> Sair'
-                : '<i class="fa-brands fa-google"></i> Entrar com Google';
-        }
-
         function formatFirebaseError(error) {
-            if (!error) return 'Verifique o Firestore e as regras no console do Firebase.';
+            if (!error) return 'Verifique se o Cloud Firestore foi criado em Modo de Teste no console do Firebase.';
             const code = error.code || '';
             if (code.includes('permission-denied')) {
-                return 'Permissão negada: confira as Regras do Firestore (veja o modal) e se você está conectado.';
+                return 'Permissão negada (permission-denied): Acesse Firestore Database -> Regras (Rules) no Firebase Console e libere leitura/escrita.';
             }
             if (code.includes('not-found') || code.includes('unavailable')) {
-                return 'Banco de dados não encontrado ou sem conexão: crie o "Firestore Database" no console do Firebase.';
+                return 'Banco de dados ainda não encontrado ou offline: Crie o banco "Firestore Database" no console do Firebase.';
             }
             return `Detalhe (${code || 'Aviso'}): ${error.message || 'Ative o Firestore Database no painel do Firebase.'}`;
         }
@@ -696,7 +625,7 @@ service cloud.firestore {
             } else {
                 badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer';
                 dot.className = 'w-2 h-2 rounded-full bg-amber-500';
-                text.textContent = state === 'signedout' ? 'Entrar para sincronizar' : 'Modo Local (Clique p/ Ativar Nuvem)';
+                text.textContent = 'Modo Local (Clique p/ Ativar Nuvem)';
                 if (modalBox) {
                     modalBox.className = 'p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium';
                     modalBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> <strong>Salvo Localmente no Navegador.</strong><br><span class="text-xs opacity-90">${escapeHtml(detailMsg || 'Clique em "Testar Conexão Agora" ou veja abaixo como liberar o Firestore Database no Firebase.')}</span>`;
@@ -704,36 +633,35 @@ service cloud.firestore {
             }
         }
 
-        function stopCloudListener() {
-            if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
-        }
+        function setupFirestoreRealtimeListener() {
+            if (!db) {
+                updateCloudStatusUI('offline', 'Firestore não inicializado.');
+                return;
+            }
 
-        function startCloudListener() {
-            stopCloudListener();
             updateCloudStatusUI('syncing');
-            let first = true;
-            unsubscribeSnapshot = userCol().onSnapshot((snap) => {
-                const cloud = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                if (snap.metadata.fromCache && cloud.length === 0) return; // aguarda o servidor
 
-                const isFirst = first;
-                first = false;
-                const seedKey = SEED_KEY + currentUser.uid;
-                if (isFirst && cloud.length === 0 && !localStorage.getItem(seedKey)) {
-                    // Primeiro login nesta conta: sobe as tarefas locais (modo sem login) uma única vez
-                    localStorage.setItem(seedKey, '1');
-                    const legacy = readTasks(STORAGE_KEY);
-                    if (legacy && legacy.length) {
-                        tasks = legacy;
-                        saveLocalCacheOnly();
-                        renderAll();
-                        replaceCloudWithLocal();
-                        return;
-                    }
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+
+            unsubscribeSnapshot = db.collection('tarefas').onSnapshot((snapshot) => {
+                const cloudTasks = [];
+                snapshot.forEach(docSnap => {
+                    cloudTasks.push(docSnap.data());
+                });
+
+                if (cloudTasks.length === 0 && tasks.length > 0 && !localStorage.getItem('taskflow_initial_cloud_seeded')) {
+                    localStorage.setItem('taskflow_initial_cloud_seeded', 'true');
+                    syncLocalToCloud(true);
+                    return;
                 }
-                tasks = cloud; // aceita também lista vazia (exclusões em outro aparelho)
-                saveLocalCacheOnly();
-                renderAll();
+
+                if (cloudTasks.length > 0) {
+                    tasks = cloudTasks;
+                    saveLocalCacheOnly();
+                    renderAll();
+                }
                 updateCloudStatusUI('synced');
             }, (error) => {
                 console.warn("Aviso Firestore Realtime:", error);
@@ -742,21 +670,31 @@ service cloud.firestore {
         }
 
         async function testFirebaseConnectionNow() {
-            if (!cloudReady()) { showToast('Entre com sua conta Google primeiro.', 'error'); return; }
+            if (!db) {
+                initFirebase();
+                if (!db) {
+                    showToast('SDK do Firebase indisponível.', 'error');
+                    return;
+                }
+            }
             updateCloudStatusUI('syncing');
+            showToast('Testando comunicação com o Firebase...', 'info');
             try {
-                await userCol().limit(1).get();
+                await db.collection('tarefas').limit(1).get();
+                updateCloudStatusUI('synced');
                 showToast('Conexão com o Firestore bem-sucedida!', 'success');
-                startCloudListener();
+                setupFirestoreRealtimeListener();
             } catch (error) {
-                updateCloudStatusUI('offline', formatFirebaseError(error));
+                const msg = formatFirebaseError(error);
+                updateCloudStatusUI('offline', msg);
                 showToast('Falha na nuvem: verifique as regras do Firestore.', 'error');
             }
         }
 
         function copyFirestoreRules() {
+            const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /tarefas/{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
             const tempArea = document.createElement('textarea');
-            tempArea.value = document.getElementById('firestoreRulesCode').textContent;
+            tempArea.value = rulesText;
             document.body.appendChild(tempArea);
             tempArea.select();
             document.execCommand('copy');
@@ -766,10 +704,10 @@ service cloud.firestore {
 
         async function upsertTaskToCloud(taskObj) {
             saveLocalCacheOnly();
-            if (!cloudReady()) return;
+            if (!db) return;
             try {
                 updateCloudStatusUI('syncing');
-                await userCol().doc(taskObj.id).set(taskObj);
+                await db.collection('tarefas').doc(taskObj.id).set(taskObj);
                 updateCloudStatusUI('synced');
             } catch (e) {
                 console.warn("Falha ao gravar no Firestore (mantido em localStorage):", e);
@@ -779,10 +717,10 @@ service cloud.firestore {
 
         async function removeTaskFromCloud(taskId) {
             saveLocalCacheOnly();
-            if (!cloudReady()) return;
+            if (!db) return;
             try {
                 updateCloudStatusUI('syncing');
-                await userCol().doc(taskId).delete();
+                await db.collection('tarefas').doc(taskId).delete();
                 updateCloudStatusUI('synced');
             } catch (e) {
                 console.warn("Falha ao remover no Firestore:", e);
@@ -790,67 +728,29 @@ service cloud.firestore {
             }
         }
 
-        // Executa operações em lotes de 400 (limite do Firestore: 500 por lote)
-        async function commitInChunks(ops) {
-            for (let i = 0; i < ops.length; i += 400) {
-                const batch = db.batch();
-                ops.slice(i, i + 400).forEach(fn => fn(batch));
-                await batch.commit();
-            }
-        }
-
         async function syncLocalToCloud(silent = false) {
-            if (!cloudReady()) {
-                if (!silent) { showToast('Entre com sua conta Google para sincronizar.', 'error'); openFirebaseHelpModal(); }
+            if (!db) {
+                if (!silent) showToast('Firestore indisponível no momento.', 'error');
                 return;
             }
             try {
                 updateCloudStatusUI('syncing');
-                await commitInChunks(tasks.map(t => b => b.set(userCol().doc(t.id), t)));
+                const batch = db.batch();
+                tasks.forEach(t => {
+                    const ref = db.collection('tarefas').doc(t.id);
+                    batch.set(ref, t);
+                });
+                await batch.commit();
                 updateCloudStatusUI('synced');
                 if (!silent) showToast(`${tasks.length} tarefas sincronizadas com o Firebase Cloud!`, 'success');
             } catch (e) {
                 console.warn("Erro ao sincronizar lote com o Firestore:", e);
                 updateCloudStatusUI('offline', formatFirebaseError(e));
-                if (!silent) { showToast('Sem permissão no Firestore. Veja como ativar no modal.', 'error'); openFirebaseHelpModal(); }
+                if (!silent) {
+                    showToast('Sem permissão no Firestore. Veja como ativar no modal.', 'error');
+                    openFirebaseHelpModal();
+                }
             }
-        }
-
-        // Deixa a nuvem idêntica à lista local (grava as atuais e apaga as que sobraram)
-        async function replaceCloudWithLocal() {
-            if (!cloudReady()) return;
-            try {
-                updateCloudStatusUI('syncing');
-                const keep = new Set(tasks.map(t => t.id));
-                const snap = await userCol().get();
-                const ops = snap.docs.filter(d => !keep.has(d.id)).map(d => b => b.delete(d.ref));
-                tasks.forEach(t => ops.push(b => b.set(userCol().doc(t.id), t)));
-                await commitInChunks(ops);
-                updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Erro ao substituir dados na nuvem:", e);
-                updateCloudStatusUI('offline', formatFirebaseError(e));
-            }
-        }
-
-        async function deleteAllCloudTasks() {
-            if (!cloudReady()) return;
-            try {
-                updateCloudStatusUI('syncing');
-                const snap = await userCol().get();
-                await commitInChunks(snap.docs.map(d => b => b.delete(d.ref)));
-                updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Erro ao limpar a nuvem:", e);
-                updateCloudStatusUI('offline', formatFirebaseError(e));
-            }
-        }
-
-        function normalizeImported(list) {
-            return list.filter(t => t && typeof t === 'object').map((t, i) => ({
-                ...t,
-                id: String(t.id || ('task-' + Date.now() + '-' + i)).replace(/\//g, '_')
-            }));
         }
 
         function openFirebaseHelpModal() {
@@ -960,24 +860,25 @@ service cloud.firestore {
             initFirebase();
         }
 
-        function readTasks(key) {
-            try {
-                const p = JSON.parse(localStorage.getItem(key));
-                return Array.isArray(p) ? p : null;
-            } catch (e) { return null; }
-        }
-
         function loadTasksFromLocalCache() {
-            cacheUid = localStorage.getItem(LAST_UID_KEY);
-            const saved = readTasks(getCacheKey());
-            if (cacheUid) { tasks = saved || []; return; }
-            tasks = saved && saved.length > 0 ? saved : generateSampleTasks();
-            if (!saved) saveLocalCacheOnly();
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    tasks = generateSampleTasks();
+                    saveLocalCacheOnly();
+                } else {
+                    const parsed = JSON.parse(raw);
+                    tasks = Array.isArray(parsed) && parsed.length > 0 ? parsed : generateSampleTasks();
+                }
+            } catch (e) {
+                console.error('Erro ao ler localStorage:', e);
+                tasks = generateSampleTasks();
+            }
         }
 
         function saveLocalCacheOnly() {
             try {
-                localStorage.setItem(getCacheKey(), JSON.stringify(tasks));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
             } catch (e) {
                 console.error('Erro ao guardar cache no navegador:', e);
             }
@@ -1688,10 +1589,10 @@ service cloud.firestore {
                 try {
                     const imported = JSON.parse(e.target.result);
                     if (!Array.isArray(imported)) throw new Error('Formato inválido');
-                    tasks = normalizeImported(imported);
+                    tasks = imported;
                     saveLocalCacheOnly();
                     renderAll();
-                    replaceCloudWithLocal();
+                    syncLocalToCloud(true);
                     showToast(`${imported.length} tarefas importadas e enviadas para a nuvem!`, 'success');
                 } catch (err) {
                     showToast('Ficheiro JSON inválido ou corrompido.', 'error');
@@ -1705,7 +1606,7 @@ service cloud.firestore {
             tasks = generateSampleTasks();
             saveLocalCacheOnly();
             renderAll();
-            replaceCloudWithLocal();
+            syncLocalToCloud(true);
             showToast('Tarefas de exemplo restauradas!', 'info');
         }
 
@@ -1718,12 +1619,21 @@ service cloud.firestore {
         }
 
         async function confirmClearAllTasks() {
+            const idsToRemove = tasks.map(t => t.id);
             tasks = [];
             saveLocalCacheOnly();
             closeClearConfirmModal();
             renderAll();
 
-            deleteAllCloudTasks();
+            if (db) {
+                try {
+                    const batch = db.batch();
+                    idsToRemove.forEach(id => batch.delete(db.collection('tarefas').doc(id)));
+                    await batch.commit();
+                } catch (e) {
+                    console.warn("Erro ao limpar coleção no Firestore:", e);
+                }
+            }
             showToast('Todas as tarefas foram removidas.', 'info');
         }
 
