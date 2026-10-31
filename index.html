@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Google Fonts: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase Compat SDKs (Works everywhere including file:// and Preview without CORS module blocks) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
     
     <script>
         tailwind.config = {
@@ -456,11 +459,12 @@
 
                 <p class="font-semibold text-slate-800 dark:text-slate-100">Como ativar o banco de dados na nuvem (caso apareça "Modo Local / Sem Permissão"):</p>
                 <ol class="list-decimal list-inside space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <li>Aceda à consola do <strong class="text-slate-700 dark:text-slate-200">Firebase Console</strong> no projeto <span class="font-mono">organizador-de-tarefas-fadc1</span>.</li>
-                    <li>No menu lateral esquerdo, clique em <strong class="text-slate-700 dark:text-slate-200">Criação (Build) &rarr; Firestore Database</strong> e clique em <strong class="text-slate-700 dark:text-slate-200">Criar base de dados</strong>.</li>
-                    <li>Selecione <strong class="text-emerald-600 dark:text-emerald-400">Iniciar no modo de teste (Test mode)</strong> ou aceda ao separador <strong>Regras (Rules)</strong> e permita leitura/escrita na coleção <span class="font-mono">tarefas</span>:</li>
+                    <li>Acesse o <strong class="text-slate-700 dark:text-slate-200">Firebase Console</strong> no projeto <span class="font-mono">organizador-de-tarefas-fadc1</span>.</li>
+                    <li>No menu lateral esquerdo, clique em <strong class="text-slate-700 dark:text-slate-200">Criação (Build) &rarr; Firestore Database</strong> e clique em <strong class="text-slate-700 dark:text-slate-200">Criar banco de dados</strong>.</li>
+                    <li>Selecione <strong class="text-emerald-600 dark:text-emerald-400">Iniciar no modo de teste (Test mode)</strong> ou acesse a aba <strong>Regras (Rules)</strong> e cole a regra abaixo:</li>
                 </ol>
-                <pre class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-700">rules_version = '2';
+                <div class="relative">
+                    <pre id="firestoreRulesCode" class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-700">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /tarefas/{document=**} {
@@ -468,16 +472,25 @@ service cloud.firestore {
     }
   }
 }</pre>
+                    <button type="button" onclick="copyFirestoreRules()" class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium border border-slate-600 transition">
+                        <i class="fa-regular fa-copy mr-1"></i>Copiar Regras
+                    </button>
+                </div>
                 <p class="text-xs text-slate-400">
-                    Enquanto o Firestore não estiver ativo, todas as suas tarefas continuam a ser guardadas em segurança no <strong>localStorage</strong> do seu navegador.
+                    Enquanto o Firestore não estiver ativo no painel do Firebase, todas as suas tarefas continuam salvas automaticamente no <strong>localStorage</strong> do navegador.
                 </p>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <button onclick="syncLocalToCloud()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Forçar Sincronização p/ Nuvem
-                </button>
-                <button onclick="closeFirebaseHelpModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="testFirebaseConnectionNow()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plug-circle-check"></i> Testar Conexão Agora
+                    </button>
+                    <button type="button" onclick="syncLocalToCloud(false)" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Tarefas p/ Nuvem
+                    </button>
+                </div>
+                <button type="button" onclick="closeFirebaseHelpModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium">
                     Fechar
                 </button>
             </div>
@@ -487,359 +500,10 @@ service cloud.firestore {
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-    <!-- Application JavaScript with Firebase ES Modules -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-        import { getAnalytics, isSupported as isAnalyticsSupported } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js";
-        import { 
-            getFirestore, 
-            collection, 
-            doc, 
-            setDoc, 
-            deleteDoc, 
-            onSnapshot, 
-            writeBatch 
-        } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-
-        /**************************************************************
-         * 0. FIREBASE INITIALIZATION
-         **************************************************************/
-        const firebaseConfig = {
-            apiKey: "AIzaSyCznnDHRTQDX1FjsBJvRmWH9nX6xV9n1C4",
-            authDomain: "organizador-de-tarefas-fadc1.firebaseapp.com",
-            projectId: "organizador-de-tarefas-fadc1",
-            storageBucket: "organizador-de-tarefas-fadc1.firebasestorage.app",
-            messagingSenderId: "828776171665",
-            appId: "1:828776171665:web:9b1fd2a30afa2f71a31730",
-            measurementId: "G-PWB2RVTPTJ"
-        };
-
-        let app = null;
-        let db = null;
-        let tasksColRef = null;
-        let cloudConnected = false;
-        let lastCloudError = null;
-
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            tasksColRef = collection(db, 'tarefas');
-            isAnalyticsSupported().then(yes => {
-                if (yes) getAnalytics(app);
-            }).catch(() => {});
-        } catch (err) {
-            console.warn("Erro na inicialização do Firebase:", err);
-        }
-
+    <!-- Application JavaScript (Standard Non-Module Script for 100% Compatibility) -->
+    <script>
         /**************************************************************
          * 1. STATE & CONSTANTS
-         **************************************************************/
-        const STORAGE_KEY = 'taskflow_pro_tasks_v1';
-        const THEME_KEY = 'taskflow_pro_theme';
-
-        let tasks = [];
-        let currentCategory = 'all';
-        let currentView = 'list'; // 'list' | 'kanban'
-        let modalSubtasks = []; // Temporary array for subtasks inside the modal
-        let draggedTaskId = null;
-
-        // Pomodoro State
-        let pomoInterval = null;
-        let pomoTimeLeft = 25 * 60;
-        let pomoIsRunning = false;
-        let pomoMode = 'focus'; // 'focus' (25m) | 'break' (5m)
-
-        const CATEGORY_META = {
-            domestico: {
-                label: 'Doméstico',
-                icon: 'fa-house',
-                badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-                borderClass: 'border-l-4 border-l-emerald-500',
-                dotClass: 'bg-emerald-500'
-            },
-            academico: {
-                label: 'Académico',
-                icon: 'fa-graduation-cap',
-                badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-                borderClass: 'border-l-4 border-l-indigo-500',
-                dotClass: 'bg-indigo-500'
-            },
-            servico: {
-                label: 'Serviço',
-                icon: 'fa-briefcase',
-                badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-                borderClass: 'border-l-4 border-l-amber-500',
-                dotClass: 'bg-amber-500'
-            }
-        };
-
-        const PRIORITY_META = {
-            urgente: { label: 'Urgente', weight: 4, badgeClass: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30', icon: 'fa-fire' },
-            alta:    { label: 'Alta',    weight: 3, badgeClass: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30', icon: 'fa-bolt' },
-            media:   { label: 'Média',   weight: 2, badgeClass: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30', icon: 'fa-thumbtack' },
-            baixa:   { label: 'Baixa',   weight: 1, badgeClass: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30', icon: 'fa-seedling' }
-        };
-
-        const STATUS_META = {
-            todo:        { label: 'A Fazer',       icon: 'fa-regular fa-circle',        color: 'text-slate-500' },
-            in_progress: { label: 'Em Andamento',  icon: 'fa-solid fa-spinner',         color: 'text-indigo-500' },
-            done:        { label: 'Concluído',     icon: 'fa-solid fa-circle-check',    color: 'text-emerald-500' }
-        };
-
-        /**************************************************************
-         * 2. CLOUD STATUS INDICATOR & FIRESTORE SYNC
-         **************************************************************/
-        function updateCloudStatusUI(state, detailMsg = '') {
-            const badge = document.getElementById('cloudStatusBadge');
-            const dot = document.getElementById('cloudStatusDot');
-            const text = document.getElementById('cloudStatusText');
-            const modalBox = document.getElementById('firebaseModalStatusBox');
-
-            if (!badge || !dot || !text) return;
-
-            if (state === 'synced') {
-                cloudConnected = true;
-                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:opacity-80 transition cursor-pointer';
-                dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-                text.textContent = 'Sincronizado (Firebase Cloud)';
-                if (modalBox) {
-                    modalBox.className = 'p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium';
-                    modalBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> Ligado em tempo real ao Cloud Firestore (${tasks.length} tarefas sincronizadas).`;
-                }
-            } else if (state === 'syncing') {
-                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:opacity-80 transition cursor-pointer';
-                dot.className = 'w-2 h-2 rounded-full bg-indigo-500 animate-ping';
-                text.textContent = 'A sincronizar...';
-            } else {
-                cloudConnected = false;
-                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer';
-                dot.className = 'w-2 h-2 rounded-full bg-amber-500';
-                text.textContent = 'Modo Local (Clique p/ Ajuda Cloud)';
-                if (modalBox) {
-                    modalBox.className = 'p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium';
-                    modalBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Modo Local Ativo. ${detailMsg || 'Verifique se o Cloud Firestore foi criado em Modo de Teste na consola do Firebase.'}`;
-                }
-            }
-        }
-
-        function setupFirestoreRealtimeListener() {
-            if (!tasksColRef) {
-                updateCloudStatusUI('offline', 'SDK do Firestore não inicializado.');
-                return;
-            }
-
-            updateCloudStatusUI('syncing');
-
-            onSnapshot(tasksColRef, (snapshot) => {
-                const cloudTasks = [];
-                snapshot.forEach(docSnap => {
-                    cloudTasks.push(docSnap.data());
-                });
-
-                // Se a nuvem estiver vazia mas tivermos tarefas locais iniciais, enviamos automaticamente
-                if (cloudTasks.length === 0 && tasks.length > 0 && !localStorage.getItem('taskflow_initial_cloud_seeded')) {
-                    localStorage.setItem('taskflow_initial_cloud_seeded', 'true');
-                    syncLocalToCloud(true);
-                    return;
-                }
-
-                if (cloudTasks.length > 0 || snapshot.metadata) {
-                    tasks = cloudTasks;
-                    saveLocalCacheOnly();
-                    renderAll();
-                }
-                updateCloudStatusUI('synced');
-            }, (error) => {
-                console.warn("Aviso Firestore Realtime:", error.code, error.message);
-                lastCloudError = error.message;
-                updateCloudStatusUI('offline', `Detalhe técnico: ${error.code || error.message}`);
-            });
-        }
-
-        async function upsertTaskToCloud(taskObj) {
-            saveLocalCacheOnly();
-            if (!db) return;
-            try {
-                updateCloudStatusUI('syncing');
-                await setDoc(doc(db, 'tarefas', taskObj.id), taskObj);
-                updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Falha ao gravar no Firestore (mantido em localStorage):", e);
-                updateCloudStatusUI('offline', e.code || e.message);
-            }
-        }
-
-        async function removeTaskFromCloud(taskId) {
-            saveLocalCacheOnly();
-            if (!db) return;
-            try {
-                updateCloudStatusUI('syncing');
-                await deleteDoc(doc(db, 'tarefas', taskId));
-                updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Falha ao remover no Firestore:", e);
-                updateCloudStatusUI('offline', e.code || e.message);
-            }
-        }
-
-        async function syncLocalToCloud(silent = false) {
-            if (!db) {
-                if (!silent) showToast('Firestore indisponível.', 'error');
-                return;
-            }
-            try {
-                updateCloudStatusUI('syncing');
-                const batch = writeBatch(db);
-                tasks.forEach(t => {
-                    const ref = doc(db, 'tarefas', t.id);
-                    batch.set(ref, t);
-                });
-                await batch.commit();
-                updateCloudStatusUI('synced');
-                if (!silent) showToast(`${tasks.length} tarefas sincronizadas com o Firebase Cloud!`, 'success');
-            } catch (e) {
-                console.warn("Erro ao sincronizar lote com o Firestore:", e);
-                updateCloudStatusUI('offline', e.code || e.message);
-                if (!silent) {
-                    showToast('Sem permissão no Firestore. Veja as instruções de regras.', 'error');
-                    openFirebaseHelpModal();
-                }
-            }
-        }
-
-        function openFirebaseHelpModal() {
-            document.getElementById('firebaseHelpModal').classList.remove('hidden');
-        }
-
-        function closeFirebaseHelpModal() {
-            document.getElementById('firebaseHelpModal').classList.add('hidden');
-        }
-
-        /**************************************************************
-         * 3. DATE HELPERS & SAMPLE DATA
-         **************************************************************/
-        function getLocalDateStr(offsetDays = 0) {
-            const d = new Date();
-            d.setDate(d.getDate() + offsetDays);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        function formatDisplayDate(dateStr) {
-            if (!dateStr) return 'Sem data';
-            const [y, m, d] = dateStr.split('-');
-            return `${d}/${m}/${y}`;
-        }
-
-        function getDueDateStatus(dueDateStr, taskStatus) {
-            if (taskStatus === 'done' || !dueDateStr) return 'normal';
-            const today = getLocalDateStr(0);
-            if (dueDateStr < today) return 'overdue';
-            if (dueDateStr === today) return 'today';
-            return 'upcoming';
-        }
-
-        function generateSampleTasks() {
-            return [
-                {
-                    id: 'sample-1',
-                    title: 'Compras do mês e organização da despensa',
-                    description: 'Verificar itens básicos de limpeza, hortofrutícolas e conferir validade dos mantimentos.',
-                    category: 'domestico',
-                    priority: 'media',
-                    dueDate: getLocalDateStr(0),
-                    status: 'todo',
-                    createdAt: Date.now() - 3600000 * 20,
-                    subtasks: [
-                        { id: 's1-1', text: 'Fazer lista de produtos de limpeza', done: true },
-                        { id: 's1-2', text: 'Comprar frutas, verduras e laticínios', done: false },
-                        { id: 's1-3', text: 'Higienizar e guardar no frigorífico', done: false }
-                    ]
-                },
-                {
-                    id: 'sample-2',
-                    title: 'Entregar Relatório de Eletrónica e Sistemas Embebidos',
-                    description: 'Rever esquemático, cálculos de dimensionamento e submeter PDF no portal académico.',
-                    category: 'academico',
-                    priority: 'urgente',
-                    dueDate: getLocalDateStr(0),
-                    status: 'in_progress',
-                    createdAt: Date.now() - 3600000 * 15,
-                    subtasks: [
-                        { id: 's2-1', text: 'Conferir simulação do circuito', done: true },
-                        { id: 's2-2', text: 'Validar código do microcontrolador', done: true },
-                        { id: 's2-3', text: 'Exportar documentação final', done: false }
-                    ]
-                },
-                {
-                    id: 'sample-3',
-                    title: 'Revisão de projeto técnico e emissão de parecer',
-                    description: 'Conferir desenhos paramétricos, lista de corte de chapas e enviar orçamento ao cliente.',
-                    category: 'servico',
-                    priority: 'alta',
-                    dueDate: getLocalDateStr(-1),
-                    status: 'in_progress',
-                    createdAt: Date.now() - 3600000 * 48,
-                    subtasks: [
-                        { id: 's3-1', text: 'Validar medidas e tolerâncias no CAD', done: true },
-                        { id: 's3-2', text: 'Gerar ficheiros DXF de planificação', done: false }
-                    ]
-                },
-                {
-                    id: 'sample-4',
-                    title: 'Manutenção preventiva e pagamento de contas da semana',
-                    description: 'Verificar faturas mensais de energia e internet e organizar comprovativos.',
-                    category: 'domestico',
-                    priority: 'baixa',
-                    dueDate: getLocalDateStr(3),
-                    status: 'done',
-                    createdAt: Date.now() - 3600000 * 72,
-                    subtasks: [
-                        { id: 's4-1', text: 'Pagar fatura de eletricidade', done: true },
-                        { id: 's4-2', text: 'Arquivar recibos na pasta digital', done: true }
-                    ]
-                }
-            ];
-        }
-
-        /**************************************************************
-         * 4. INITIALIZATION & LOCAL CACHE
-         **************************************************************/
-        function initApp() {
-            loadTheme();
-            loadTasksFromLocalCache();
-            renderAll();
-            setupFirestoreRealtimeListener();
-        }
-
-        function loadTasksFromLocalCache() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) {
-                    tasks = generateSampleTasks();
-                    saveLocalCacheOnly();
-                } else {
-                    const parsed = JSON.parse(raw);
-                    tasks = Array.isArray(parsed) ? parsed : generateSampleTasks();
-                }
-            } catch (e) {
-                console.error('Erro ao ler localStorage:', e);
-                tasks = generateSampleTasks();
-            }
-        }
-
-        function saveLocalCacheOnly() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-            } catch (e) {
-                showToast('Erro ao guardar cache no navegador.', 'error');
-            }
-        }
-
-        /**************************************************************
-         * 5. THEME MANAGEMENT (DARK / LIGHT)
          **************************************************************/
         const STORAGE_KEY = 'taskflow_pro_tasks_v1';
         const THEME_KEY = 'taskflow_pro_theme';
@@ -894,7 +558,211 @@ service cloud.firestore {
         };
 
         /**************************************************************
-         * 2. DATE HELPERS & SAMPLE DATA
+         * 2. FIREBASE INITIALIZATION & CLOUD SYNC
+         **************************************************************/
+        const firebaseConfig = {
+            apiKey: "AIzaSyCznnDHRTQDX1FjsBJvRmWH9nX6xV9n1C4",
+            authDomain: "organizador-de-tarefas-fadc1.firebaseapp.com",
+            projectId: "organizador-de-tarefas-fadc1",
+            storageBucket: "organizador-de-tarefas-fadc1.firebasestorage.app",
+            messagingSenderId: "828776171665",
+            appId: "1:828776171665:web:9b1fd2a30afa2f71a31730",
+            measurementId: "G-PWB2RVTPTJ"
+        };
+
+        let db = null;
+        let unsubscribeSnapshot = null;
+
+        function initFirebase() {
+            if (typeof firebase === 'undefined') {
+                updateCloudStatusUI('offline', 'Scripts do Firebase não carregados (Sem internet ou bloqueio de rede).');
+                return;
+            }
+            try {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                db = firebase.firestore();
+                setupFirestoreRealtimeListener();
+            } catch (err) {
+                console.warn("Erro na inicialização do Firebase:", err);
+                updateCloudStatusUI('offline', err.message || 'Erro ao inicializar SDK.');
+            }
+        }
+
+        function formatFirebaseError(error) {
+            if (!error) return 'Verifique se o Cloud Firestore foi criado em Modo de Teste no console do Firebase.';
+            const code = error.code || '';
+            if (code.includes('permission-denied')) {
+                return 'Permissão negada (permission-denied): Acesse Firestore Database -> Regras (Rules) no Firebase Console e libere leitura/escrita.';
+            }
+            if (code.includes('not-found') || code.includes('unavailable')) {
+                return 'Banco de dados ainda não encontrado ou offline: Crie o banco "Firestore Database" no console do Firebase.';
+            }
+            return `Detalhe (${code || 'Aviso'}): ${error.message || 'Ative o Firestore Database no painel do Firebase.'}`;
+        }
+
+        function updateCloudStatusUI(state, detailMsg = '') {
+            const badge = document.getElementById('cloudStatusBadge');
+            const dot = document.getElementById('cloudStatusDot');
+            const text = document.getElementById('cloudStatusText');
+            const modalBox = document.getElementById('firebaseModalStatusBox');
+
+            if (!badge || !dot || !text) return;
+
+            if (state === 'synced') {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:opacity-80 transition cursor-pointer';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+                text.textContent = 'Sincronizado (Firebase Cloud)';
+                if (modalBox) {
+                    modalBox.className = 'p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium';
+                    modalBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> Conectado em tempo real ao Cloud Firestore (${tasks.length} tarefas sincronizadas).`;
+                }
+            } else if (state === 'syncing') {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:opacity-80 transition cursor-pointer';
+                dot.className = 'w-2 h-2 rounded-full bg-indigo-500 animate-ping';
+                text.textContent = 'Sincronizando...';
+            } else {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer';
+                dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+                text.textContent = 'Modo Local (Clique p/ Ativar Nuvem)';
+                if (modalBox) {
+                    modalBox.className = 'p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium';
+                    modalBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> <strong>Salvo Localmente no Navegador.</strong><br><span class="text-xs opacity-90">${escapeHtml(detailMsg || 'Clique em "Testar Conexão Agora" ou veja abaixo como liberar o Firestore Database no Firebase.')}</span>`;
+                }
+            }
+        }
+
+        function setupFirestoreRealtimeListener() {
+            if (!db) {
+                updateCloudStatusUI('offline', 'Firestore não inicializado.');
+                return;
+            }
+
+            updateCloudStatusUI('syncing');
+
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+
+            unsubscribeSnapshot = db.collection('tarefas').onSnapshot((snapshot) => {
+                const cloudTasks = [];
+                snapshot.forEach(docSnap => {
+                    cloudTasks.push(docSnap.data());
+                });
+
+                if (cloudTasks.length === 0 && tasks.length > 0 && !localStorage.getItem('taskflow_initial_cloud_seeded')) {
+                    localStorage.setItem('taskflow_initial_cloud_seeded', 'true');
+                    syncLocalToCloud(true);
+                    return;
+                }
+
+                if (cloudTasks.length > 0) {
+                    tasks = cloudTasks;
+                    saveLocalCacheOnly();
+                    renderAll();
+                }
+                updateCloudStatusUI('synced');
+            }, (error) => {
+                console.warn("Aviso Firestore Realtime:", error);
+                updateCloudStatusUI('offline', formatFirebaseError(error));
+            });
+        }
+
+        async function testFirebaseConnectionNow() {
+            if (!db) {
+                initFirebase();
+                if (!db) {
+                    showToast('SDK do Firebase indisponível.', 'error');
+                    return;
+                }
+            }
+            updateCloudStatusUI('syncing');
+            showToast('Testando comunicação com o Firebase...', 'info');
+            try {
+                await db.collection('tarefas').limit(1).get();
+                updateCloudStatusUI('synced');
+                showToast('Conexão com o Firestore bem-sucedida!', 'success');
+                setupFirestoreRealtimeListener();
+            } catch (error) {
+                const msg = formatFirebaseError(error);
+                updateCloudStatusUI('offline', msg);
+                showToast('Falha na nuvem: verifique as regras do Firestore.', 'error');
+            }
+        }
+
+        function copyFirestoreRules() {
+            const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /tarefas/{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
+            const tempArea = document.createElement('textarea');
+            tempArea.value = rulesText;
+            document.body.appendChild(tempArea);
+            tempArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempArea);
+            showToast('Regras copiadas para a área de transferência!', 'success');
+        }
+
+        async function upsertTaskToCloud(taskObj) {
+            saveLocalCacheOnly();
+            if (!db) return;
+            try {
+                updateCloudStatusUI('syncing');
+                await db.collection('tarefas').doc(taskObj.id).set(taskObj);
+                updateCloudStatusUI('synced');
+            } catch (e) {
+                console.warn("Falha ao gravar no Firestore (mantido em localStorage):", e);
+                updateCloudStatusUI('offline', formatFirebaseError(e));
+            }
+        }
+
+        async function removeTaskFromCloud(taskId) {
+            saveLocalCacheOnly();
+            if (!db) return;
+            try {
+                updateCloudStatusUI('syncing');
+                await db.collection('tarefas').doc(taskId).delete();
+                updateCloudStatusUI('synced');
+            } catch (e) {
+                console.warn("Falha ao remover no Firestore:", e);
+                updateCloudStatusUI('offline', formatFirebaseError(e));
+            }
+        }
+
+        async function syncLocalToCloud(silent = false) {
+            if (!db) {
+                if (!silent) showToast('Firestore indisponível no momento.', 'error');
+                return;
+            }
+            try {
+                updateCloudStatusUI('syncing');
+                const batch = db.batch();
+                tasks.forEach(t => {
+                    const ref = db.collection('tarefas').doc(t.id);
+                    batch.set(ref, t);
+                });
+                await batch.commit();
+                updateCloudStatusUI('synced');
+                if (!silent) showToast(`${tasks.length} tarefas sincronizadas com o Firebase Cloud!`, 'success');
+            } catch (e) {
+                console.warn("Erro ao sincronizar lote com o Firestore:", e);
+                updateCloudStatusUI('offline', formatFirebaseError(e));
+                if (!silent) {
+                    showToast('Sem permissão no Firestore. Veja como ativar no modal.', 'error');
+                    openFirebaseHelpModal();
+                }
+            }
+        }
+
+        function openFirebaseHelpModal() {
+            document.getElementById('firebaseHelpModal').classList.remove('hidden');
+        }
+
+        function closeFirebaseHelpModal() {
+            document.getElementById('firebaseHelpModal').classList.add('hidden');
+        }
+
+        /**************************************************************
+         * 3. DATE HELPERS & SAMPLE DATA
          **************************************************************/
         function getLocalDateStr(offsetDays = 0) {
             const d = new Date();
@@ -927,7 +795,7 @@ service cloud.firestore {
                     description: 'Verificar itens básicos de limpeza, hortifruti e conferir validade dos mantimentos.',
                     category: 'domestico',
                     priority: 'media',
-                    dueDate: getLocalDateStr(0), // Vence Hoje
+                    dueDate: getLocalDateStr(0),
                     status: 'todo',
                     createdAt: Date.now() - 3600000 * 20,
                     subtasks: [
@@ -938,68 +806,69 @@ service cloud.firestore {
                 },
                 {
                     id: 'sample-2',
-                    title: 'Entregar Trabalho Prático de Engenharia de Software',
-                    description: 'Revisar diagramas UML, documentação de requisitos e subir repositório final no portal acadêmico.',
+                    title: 'Entregar Relatório de Eletrônica e Sistemas Embarcados',
+                    description: 'Revisar esquemático, cálculos de dimensionamento e submeter PDF no portal acadêmico.',
                     category: 'academico',
                     priority: 'urgente',
-                    dueDate: getLocalDateStr(0), // Vence Hoje
+                    dueDate: getLocalDateStr(0),
                     status: 'in_progress',
                     createdAt: Date.now() - 3600000 * 15,
                     subtasks: [
-                        { id: 's2-1', text: 'Escrever introdução e objetivos', done: true },
-                        { id: 's2-2', text: 'Validar protótipo e testes unitários', done: true },
-                        { id: 's2-3', text: 'Gerar PDF nas normas ABNT', done: false }
+                        { id: 's2-1', text: 'Conferir simulação do circuito', done: true },
+                        { id: 's2-2', text: 'Validar código do microcontrolador', done: true },
+                        { id: 's2-3', text: 'Exportar documentação final', done: false }
                     ]
                 },
                 {
                     id: 'sample-3',
-                    title: 'Apresentação de resultados e alinhamento com cliente',
-                    description: 'Preparar indicadores de desempenho da sprint e cronograma de implantação do próximo mês.',
+                    title: 'Revisão de projeto técnico e emissão de parecer',
+                    description: 'Conferir desenhos paramétricos, lista de corte de chapas e enviar orçamento ao cliente.',
                     category: 'servico',
                     priority: 'alta',
-                    dueDate: getLocalDateStr(-1), // Atrasada
+                    dueDate: getLocalDateStr(-1),
                     status: 'in_progress',
                     createdAt: Date.now() - 3600000 * 48,
                     subtasks: [
-                        { id: 's3-1', text: 'Consolidar métricas de performance', done: true },
-                        { id: 's3-2', text: 'Montar slides executivos', done: false }
+                        { id: 's3-1', text: 'Validar medidas e tolerâncias no CAD', done: true },
+                        { id: 's3-2', text: 'Gerar arquivos DXF de planificação', done: false }
                     ]
                 },
                 {
                     id: 'sample-4',
-                    title: 'Manutenção preventiva do filtro de água e contas da semana',
-                    description: 'Agendar troca do refil purificador e quitar fatura de energia elétrica.',
+                    title: 'Manutenção preventiva e pagamento de contas da semana',
+                    description: 'Verificar faturas mensais de energia e internet e organizar comprovantes.',
                     category: 'domestico',
                     priority: 'baixa',
-                    dueDate: getLocalDateStr(3), // Futuro
+                    dueDate: getLocalDateStr(3),
                     status: 'done',
                     createdAt: Date.now() - 3600000 * 72,
                     subtasks: [
-                        { id: 's4-1', text: 'Pagar conta de luz pelo aplicativo', done: true },
-                        { id: 's4-2', text: 'Trocar elemento filtrante', done: true }
+                        { id: 's4-1', text: 'Pagar fatura de eletricidade', done: true },
+                        { id: 's4-2', text: 'Arquivar recibos na pasta digital', done: true }
                     ]
                 }
             ];
         }
 
         /**************************************************************
-         * 3. INITIALIZATION & STORAGE
+         * 4. INITIALIZATION & LOCAL CACHE
          **************************************************************/
         function initApp() {
             loadTheme();
-            loadTasks();
+            loadTasksFromLocalCache();
             renderAll();
+            initFirebase();
         }
 
-        function loadTasks() {
+        function loadTasksFromLocalCache() {
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
                 if (!raw) {
                     tasks = generateSampleTasks();
-                    saveTasks();
+                    saveLocalCacheOnly();
                 } else {
                     const parsed = JSON.parse(raw);
-                    tasks = Array.isArray(parsed) ? parsed : generateSampleTasks();
+                    tasks = Array.isArray(parsed) && parsed.length > 0 ? parsed : generateSampleTasks();
                 }
             } catch (e) {
                 console.error('Erro ao ler localStorage:', e);
@@ -1007,16 +876,16 @@ service cloud.firestore {
             }
         }
 
-        function saveTasks() {
+        function saveLocalCacheOnly() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
             } catch (e) {
-                showToast('Erro ao salvar dados no navegador.', 'error');
+                console.error('Erro ao guardar cache no navegador:', e);
             }
         }
 
         /**************************************************************
-         * 4. THEME MANAGEMENT (DARK / LIGHT)
+         * 5. THEME MANAGEMENT (DARK / LIGHT)
          **************************************************************/
         function loadTheme() {
             const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
@@ -1758,8 +1627,8 @@ service cloud.firestore {
 
             if (db) {
                 try {
-                    const batch = writeBatch(db);
-                    idsToRemove.forEach(id => batch.delete(doc(db, 'tarefas', id)));
+                    const batch = db.batch();
+                    idsToRemove.forEach(id => batch.delete(db.collection('tarefas').doc(id)));
                     await batch.commit();
                 } catch (e) {
                     console.warn("Erro ao limpar coleção no Firestore:", e);
@@ -1769,7 +1638,7 @@ service cloud.firestore {
         }
 
         /**************************************************************
-         * 11. TOAST NOTIFICATIONS & GLOBAL EXPORTS
+         * 11. TOAST NOTIFICATIONS & STARTUP
          **************************************************************/
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
@@ -1800,44 +1669,8 @@ service cloud.firestore {
             }, 3000);
         }
 
-        // Expose functions to global window scope for inline HTML event handlers
-        Object.assign(window, {
-            toggleTheme,
-            setCategoryFilter,
-            setViewMode,
-            handleFiltersChange,
-            openTaskModal,
-            closeTaskModal,
-            handleSubtaskEnter,
-            addSubtaskToModal,
-            toggleModalSubtask,
-            removeModalSubtask,
-            saveTaskForm,
-            changeTaskStatus,
-            toggleQuickDone,
-            toggleSubtask,
-            deleteTask,
-            handleDragStart,
-            handleDragEnd,
-            handleDragOver,
-            handleDragLeave,
-            handleDrop,
-            togglePomodoroMode,
-            startPausePomodoro,
-            resetPomodoro,
-            exportTasksJSON,
-            importTasksJSON,
-            restoreSampleTasks,
-            openClearConfirmModal,
-            closeClearConfirmModal,
-            confirmClearAllTasks,
-            syncLocalToCloud,
-            openFirebaseHelpModal,
-            closeFirebaseHelpModal
-        });
-
-        // Launch App
-        initApp();
+        // Launch App Safely
+        window.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
