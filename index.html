@@ -78,17 +78,27 @@
                     <i class="fa-solid fa-layer-group text-lg"></i>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-emerald-500 dark:from-indigo-400 dark:to-emerald-400 bg-clip-text text-transparent">
                             TaskFlow <span class="font-normal text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">360º Cloud</span>
                         </h1>
+                        <!-- Shared Workspace Selector -->
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full px-2.5 py-0.5 border border-slate-200 dark:border-slate-700 text-[11px]" title="Todos os usuários com o mesmo código de Espaço veem e editam as mesmas tarefas em tempo real">
+                            <i class="fa-solid fa-users text-indigo-500 mr-1.5"></i>
+                            <span class="text-slate-400 mr-1 hidden sm:inline">Sala:</span>
+                            <input id="workspaceInput" type="text" value="geral" onchange="changeWorkspace(this.value)" class="bg-transparent font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none w-16 sm:w-20 text-center uppercase tracking-wider" placeholder="GERAL">
+                        </div>
                         <!-- Cloud Status Badge -->
-                        <button onclick="openFirebaseHelpModal()" id="cloudStatusBadge" title="Clique para ver detalhes da ligação Firebase Cloud" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer">
+                        <button onclick="openFirebaseHelpModal()" id="cloudStatusBadge" title="Clique para ver diagnóstico da nuvem Firebase" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer">
                             <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                            <span id="cloudStatusText">A ligar ao Firebase...</span>
+                            <span id="cloudStatusText">Conectando...</span>
+                        </button>
+                        <!-- Force Sync Now Button -->
+                        <button onclick="forceFullSyncNow()" id="forceSyncBtn" title="Forçar sincronização imediata com todos os usuários" class="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 text-slate-500 dark:text-slate-300 hover:text-indigo-500 flex items-center justify-center border border-slate-200 dark:border-slate-700 transition">
+                            <i id="forceSyncIcon" class="fa-solid fa-rotate text-[11px]"></i>
                         </button>
                     </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Doméstico • Académico • Serviço (Sincronização Firebase)</p>
+                    <p id="lastSyncSubtext" class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Sincronização multi-usuário ativa • Sala compartilhada</p>
                 </div>
             </div>
 
@@ -333,10 +343,16 @@
             <form id="taskForm" onsubmit="saveTaskForm(event)" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                 <input type="hidden" id="taskIdInput">
 
-                <!-- Title -->
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Título da Tarefa *</label>
-                    <input type="text" id="taskTitleInput" required placeholder="Ex: Entregar relatório de estágio, Comprar mantimentos..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-indigo-500 text-sm">
+                <!-- Title & Author Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Título da Tarefa *</label>
+                        <input type="text" id="taskTitleInput" required placeholder="Ex: Entregar relatório, Comprar mantimentos..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Responsável / Autor</label>
+                        <input type="text" id="taskAuthorInput" placeholder="Ex: Ana, Carlos..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
                 </div>
 
                 <!-- Description -->
@@ -436,14 +452,14 @@
 
     <!-- Firebase Cloud Status & Setup Help Modal -->
     <div id="firebaseHelpModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white dark:bg-darkCard w-full max-w-lg rounded-2xl border border-slate-200 dark:border-darkBorder shadow-2xl p-6 space-y-4">
+        <div class="bg-white dark:bg-darkCard w-full max-w-lg rounded-2xl border border-slate-200 dark:border-darkBorder shadow-2xl p-6 space-y-4 my-8">
             <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
                 <div class="flex items-center gap-2.5">
                     <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-lg">
                         <i class="fa-solid fa-cloud-bolt"></i>
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Ligação Firebase Cloud Firestore</h3>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Diagnóstico de Sincronização Multi-Usuário</h3>
                         <p class="text-xs text-slate-400">Projeto: <span class="font-mono text-indigo-400">organizador-de-tarefas-fadc1</span></p>
                     </div>
                 </div>
@@ -457,17 +473,24 @@
                     Estado atual: A verificar ligação...
                 </div>
 
-                <p class="font-semibold text-slate-800 dark:text-slate-100">Como ativar o banco de dados na nuvem (caso apareça "Modo Local / Sem Permissão"):</p>
+                <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1.5">
+                    <div class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-users"></i> Como funciona a sincronização entre usuários:
+                    </div>
+                    <p>Certifique-se de que todos os usuários digitem o mesmo nome no campo <strong>Sala</strong> no topo da página (por padrão: <strong>GERAL</strong>). Qualquer tarefa criada, movida ou concluída aparece automaticamente para todos em tempo real.</p>
+                </div>
+
+                <p class="font-semibold text-slate-800 dark:text-slate-100">Se aparecer erro de "Banco Não Criado" ou "Permissão Negada" no Firebase:</p>
                 <ol class="list-decimal list-inside space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <li>Acesse o <strong class="text-slate-700 dark:text-slate-200">Firebase Console</strong> no projeto <span class="font-mono">organizador-de-tarefas-fadc1</span>.</li>
-                    <li>No menu lateral esquerdo, clique em <strong class="text-slate-700 dark:text-slate-200">Criação (Build) &rarr; Firestore Database</strong> e clique em <strong class="text-slate-700 dark:text-slate-200">Criar banco de dados</strong>.</li>
-                    <li>Selecione <strong class="text-emerald-600 dark:text-emerald-400">Iniciar no modo de teste (Test mode)</strong> ou acesse a aba <strong>Regras (Rules)</strong> e cole a regra abaixo:</li>
+                    <li>Abra diretamente o painel do seu projeto clicando aqui: <a href="https://console.firebase.google.com/project/organizador-de-tarefas-fadc1/firestore" target="_blank" rel="noopener noreferrer" class="text-indigo-500 underline font-semibold hover:text-indigo-400">Abrir Firestore no Firebase Console <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a></li>
+                    <li>Se ainda não houver banco criado, clique em <strong class="text-slate-700 dark:text-slate-200">Criar banco de dados (Create database)</strong> e escolha <strong class="text-emerald-600 dark:text-emerald-400">Iniciar no modo de teste (Test mode)</strong>.</li>
+                    <li>Na aba <strong class="text-slate-700 dark:text-slate-200">Regras (Rules)</strong> do Firestore, cole as regras abaixo e clique em <strong>Publicar (Publish)</strong>:</li>
                 </ol>
                 <div class="relative">
                     <pre id="firestoreRulesCode" class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-700">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /tarefas/{document=**} {
+    match /{document=**} {
       allow read, write: if true;
     }
   }
@@ -476,18 +499,15 @@ service cloud.firestore {
                         <i class="fa-regular fa-copy mr-1"></i>Copiar Regras
                     </button>
                 </div>
-                <p class="text-xs text-slate-400">
-                    Enquanto o Firestore não estiver ativo no painel do Firebase, todas as suas tarefas continuam salvas automaticamente no <strong>localStorage</strong> do navegador.
-                </p>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                 <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" onclick="testFirebaseConnectionNow()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-plug-circle-check"></i> Testar Conexão Agora
+                    <button type="button" onclick="forceFullSyncNow()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate"></i> Testar e Sincronizar Agora
                     </button>
                     <button type="button" onclick="syncLocalToCloud(false)" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Tarefas p/ Nuvem
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Forçar Envio Local p/ Nuvem
                     </button>
                 </div>
                 <button type="button" onclick="closeFirebaseHelpModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium">
@@ -505,14 +525,21 @@ service cloud.firestore {
         /**************************************************************
          * 1. STATE & CONSTANTS
          **************************************************************/
-        const STORAGE_KEY = 'taskflow_pro_tasks_v1';
+        const STORAGE_KEY_PREFIX = 'taskflow_pro_tasks_v3_';
+        const WORKSPACE_KEY = 'taskflow_pro_workspace_v3';
+        const AUTHOR_KEY = 'taskflow_pro_author_v3';
         const THEME_KEY = 'taskflow_pro_theme';
 
+        let currentWorkspace = (localStorage.getItem(WORKSPACE_KEY) || 'geral').trim().toLowerCase() || 'geral';
+        let currentAuthor = localStorage.getItem(AUTHOR_KEY) || '';
         let tasks = [];
         let currentCategory = 'all';
         let currentView = 'list'; // 'list' | 'kanban'
         let modalSubtasks = []; // Temporary array for subtasks inside the modal
         let draggedTaskId = null;
+        let isApplyingRemoteUpdate = false;
+        let restPollingInterval = null;
+        let lastSyncTimestamp = null;
 
         // Pomodoro State
         let pomoInterval = null;
@@ -558,7 +585,7 @@ service cloud.firestore {
         };
 
         /**************************************************************
-         * 2. FIREBASE INITIALIZATION & CLOUD SYNC
+         * 2. MULTI-USER FIREBASE SYNC ENGINE (SDK + REST API FALLBACK)
          **************************************************************/
         const firebaseConfig = {
             apiKey: "AIzaSyCznnDHRTQDX1FjsBJvRmWH9nX6xV9n1C4",
@@ -570,12 +597,48 @@ service cloud.firestore {
             measurementId: "G-PWB2RVTPTJ"
         };
 
+        const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
         let db = null;
         let unsubscribeSnapshot = null;
+        let sdkRealtimeActive = false;
+
+        function getCollectionName() {
+            const clean = (currentWorkspace || 'geral').replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'geral';
+            return clean === 'geral' ? 'tarefas' : `tarefas_${clean}`;
+        }
+
+        function getStorageKey() {
+            return STORAGE_KEY_PREFIX + getCollectionName();
+        }
+
+        function changeWorkspace(newWorkspaceName) {
+            const clean = (newWorkspaceName || 'geral').trim().replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'geral';
+            currentWorkspace = clean;
+            localStorage.setItem(WORKSPACE_KEY, currentWorkspace);
+            const input = document.getElementById('workspaceInput');
+            if (input) input.value = currentWorkspace.toUpperCase();
+
+            loadTasksFromLocalCache(false);
+            renderAll();
+            showToast(`Alternado para a Sala Compartilhada: ${currentWorkspace.toUpperCase()}`, 'info');
+            setupFirestoreRealtimeListener();
+            fetchTasksViaRestFallback(true);
+        }
 
         function initFirebase() {
+            const input = document.getElementById('workspaceInput');
+            if (input) input.value = currentWorkspace.toUpperCase();
+
+            // Always start HTTP REST polling fallback every 6 seconds to guarantee multi-user sync
+            // even when WebSockets/gRPC are blocked on file:// or corporate firewalls
+            if (restPollingInterval) clearInterval(restPollingInterval);
+            restPollingInterval = setInterval(() => {
+                fetchTasksViaRestFallback(false);
+            }, 6000);
+
             if (typeof firebase === 'undefined') {
-                updateCloudStatusUI('offline', 'Scripts do Firebase não carregados (Sem internet ou bloqueio de rede).');
+                fetchTasksViaRestFallback(true);
                 return;
             }
             try {
@@ -584,22 +647,24 @@ service cloud.firestore {
                 }
                 db = firebase.firestore();
                 setupFirestoreRealtimeListener();
+                fetchTasksViaRestFallback(true);
             } catch (err) {
-                console.warn("Erro na inicialização do Firebase:", err);
-                updateCloudStatusUI('offline', err.message || 'Erro ao inicializar SDK.');
+                console.warn("Erro na inicialização do Firebase SDK, usando motor REST HTTP:", err);
+                fetchTasksViaRestFallback(true);
             }
         }
 
         function formatFirebaseError(error) {
             if (!error) return 'Verifique se o Cloud Firestore foi criado em Modo de Teste no console do Firebase.';
-            const code = error.code || '';
-            if (code.includes('permission-denied')) {
-                return 'Permissão negada (permission-denied): Acesse Firestore Database -> Regras (Rules) no Firebase Console e libere leitura/escrita.';
+            const code = String(error.code || error.status || '').toLowerCase();
+            const msg = String(error.message || '');
+            if (code.includes('permission-denied') || code.includes('403') || msg.includes('PERMISSION_DENIED')) {
+                return 'Permissão negada (403 PERMISSION_DENIED): As regras do Firestore estão bloqueando o acesso. Abra o Console do Firebase -> Firestore Database -> Regras (Rules) e cole a regra pública do modal abaixo.';
             }
-            if (code.includes('not-found') || code.includes('unavailable')) {
-                return 'Banco de dados ainda não encontrado ou offline: Crie o banco "Firestore Database" no console do Firebase.';
+            if (code.includes('not-found') || code.includes('404') || msg.includes('NOT_FOUND')) {
+                return 'Banco de dados Firestore ainda não foi criado (404 NOT_FOUND): Clique no link do modal abaixo para abrir o Firebase Console e clique em "Criar banco de dados" (Modo de Teste).';
             }
-            return `Detalhe (${code || 'Aviso'}): ${error.message || 'Ative o Firestore Database no painel do Firebase.'}`;
+            return `Detalhe técnico (${code || 'Aviso'}): ${msg || 'Ative o Firestore Database no painel do Firebase.'}`;
         }
 
         function updateCloudStatusUI(state, detailMsg = '') {
@@ -607,147 +672,305 @@ service cloud.firestore {
             const dot = document.getElementById('cloudStatusDot');
             const text = document.getElementById('cloudStatusText');
             const modalBox = document.getElementById('firebaseModalStatusBox');
+            const subtext = document.getElementById('lastSyncSubtext');
 
             if (!badge || !dot || !text) return;
 
+            const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
             if (state === 'synced') {
+                lastSyncTimestamp = timeStr;
                 badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:opacity-80 transition cursor-pointer';
                 dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-                text.textContent = 'Sincronizado (Firebase Cloud)';
+                text.textContent = `Online • Sala: ${currentWorkspace.toUpperCase()}`;
+                if (subtext) {
+                    subtext.textContent = `Sincronizado com todos os usuários às ${timeStr} (${tasks.length} tarefas na sala ${currentWorkspace.toUpperCase()})`;
+                }
                 if (modalBox) {
                     modalBox.className = 'p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium';
-                    modalBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> Conectado em tempo real ao Cloud Firestore (${tasks.length} tarefas sincronizadas).`;
+                    modalBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> <strong>Sincronização Multi-Usuário Ativa!</strong><br><span class="text-xs">Conectado à coleção <code>${getCollectionName()}</code> (${tasks.length} tarefas compartilhadas). Última atualização às ${timeStr}.</span>`;
                 }
             } else if (state === 'syncing') {
                 badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:opacity-80 transition cursor-pointer';
                 dot.className = 'w-2 h-2 rounded-full bg-indigo-500 animate-ping';
                 text.textContent = 'Sincronizando...';
             } else {
-                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:opacity-80 transition cursor-pointer';
-                dot.className = 'w-2 h-2 rounded-full bg-amber-500';
-                text.textContent = 'Modo Local (Clique p/ Ativar Nuvem)';
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:opacity-80 transition cursor-pointer';
+                dot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-pulse';
+                text.textContent = 'Ação Necessária na Nuvem (Clique Aqui)';
+                if (subtext) {
+                    subtext.textContent = 'Aviso: Banco Firestore precisa ser ativado/liberado no console do Firebase para sincronizar entre usuários.';
+                }
                 if (modalBox) {
-                    modalBox.className = 'p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium';
-                    modalBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> <strong>Salvo Localmente no Navegador.</strong><br><span class="text-xs opacity-90">${escapeHtml(detailMsg || 'Clique em "Testar Conexão Agora" ou veja abaixo como liberar o Firestore Database no Firebase.')}</span>`;
+                    modalBox.className = 'p-3 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-medium';
+                    modalBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> <strong>Por que não está sincronizando entre usuários?</strong><br><span class="text-xs opacity-95">${escapeHtml(detailMsg || 'O banco de dados Cloud Firestore ainda não foi criado ou está com regras bloqueadas no Console do Firebase.')}</span>`;
                 }
             }
         }
 
-        function setupFirestoreRealtimeListener() {
-            if (!db) {
-                updateCloudStatusUI('offline', 'Firestore não inicializado.');
-                return;
-            }
-
-            updateCloudStatusUI('syncing');
-
-            if (unsubscribeSnapshot) {
-                unsubscribeSnapshot();
-            }
-
-            unsubscribeSnapshot = db.collection('tarefas').onSnapshot((snapshot) => {
-                const cloudTasks = [];
-                snapshot.forEach(docSnap => {
-                    cloudTasks.push(docSnap.data());
-                });
-
-                if (cloudTasks.length === 0 && tasks.length > 0 && !localStorage.getItem('taskflow_initial_cloud_seeded')) {
-                    localStorage.setItem('taskflow_initial_cloud_seeded', 'true');
-                    syncLocalToCloud(true);
-                    return;
-                }
-
-                if (cloudTasks.length > 0) {
+        // Apply remote cloud tasks without overwriting cloud with local samples
+        function applyCloudTasksList(cloudTasks) {
+            isApplyingRemoteUpdate = true;
+            try {
+                // Sort consistently by updatedAt/createdAt
+                cloudTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                const currentJson = JSON.stringify(tasks);
+                const newJson = JSON.stringify(cloudTasks);
+                if (currentJson !== newJson) {
                     tasks = cloudTasks;
                     saveLocalCacheOnly();
                     renderAll();
                 }
+            } finally {
+                isApplyingRemoteUpdate = false;
+            }
+        }
+
+        function setupFirestoreRealtimeListener() {
+            if (!db) return;
+
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
+            }
+
+            const colName = getCollectionName();
+            unsubscribeSnapshot = db.collection(colName).onSnapshot((snapshot) => {
+                sdkRealtimeActive = true;
+                const cloudTasks = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data && data.id) cloudTasks.push(data);
+                });
+
+                // Only seed sample tasks if cloud is completely empty AND this workspace was never initialized
+                if (cloudTasks.length === 0 && tasks.length === 0 && !localStorage.getItem('tf_seeded_' + colName)) {
+                    localStorage.setItem('tf_seeded_' + colName, 'true');
+                    tasks = generateSampleTasks();
+                    saveLocalCacheOnly();
+                    renderAll();
+                    syncLocalToCloud(true);
+                    return;
+                }
+
+                applyCloudTasksList(cloudTasks);
                 updateCloudStatusUI('synced');
             }, (error) => {
-                console.warn("Aviso Firestore Realtime:", error);
+                sdkRealtimeActive = false;
+                console.warn("Aviso Firestore SDK Realtime:", error);
                 updateCloudStatusUI('offline', formatFirebaseError(error));
             });
         }
 
-        async function testFirebaseConnectionNow() {
-            if (!db) {
-                initFirebase();
-                if (!db) {
-                    showToast('SDK do Firebase indisponível.', 'error');
-                    return;
-                }
+        /**************************************************************
+         * 2B. DIRECT HTTP REST API ENGINE (Bypasses WebSocket/CORS issues)
+         **************************************************************/
+        function toFirestoreValue(val) {
+            if (val === null || val === undefined) return { nullValue: null };
+            if (typeof val === 'boolean') return { booleanValue: val };
+            if (typeof val === 'number') {
+                return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
             }
-            updateCloudStatusUI('syncing');
-            showToast('Testando comunicação com o Firebase...', 'info');
+            if (typeof val === 'string') return { stringValue: val };
+            if (Array.isArray(val)) {
+                return { arrayValue: { values: val.map(toFirestoreValue) } };
+            }
+            if (typeof val === 'object') {
+                const fields = {};
+                for (const k of Object.keys(val)) {
+                    fields[k] = toFirestoreValue(val[k]);
+                }
+                return { mapValue: { fields } };
+            }
+            return { stringValue: String(val) };
+        }
+
+        function fromFirestoreValue(fv) {
+            if (!fv || typeof fv !== 'object') return null;
+            if ('stringValue' in fv) return fv.stringValue;
+            if ('booleanValue' in fv) return Boolean(fv.booleanValue);
+            if ('integerValue' in fv) return Number(fv.integerValue);
+            if ('doubleValue' in fv) return Number(fv.doubleValue);
+            if ('nullValue' in fv) return null;
+            if ('arrayValue' in fv) {
+                const vals = fv.arrayValue.values || [];
+                return vals.map(fromFirestoreValue);
+            }
+            if ('mapValue' in fv) {
+                const obj = {};
+                const fields = fv.mapValue.fields || {};
+                for (const k of Object.keys(fields)) {
+                    obj[k] = fromFirestoreValue(fields[k]);
+                }
+                return obj;
+            }
+            return null;
+        }
+
+        function taskToFirestoreDoc(taskObj) {
+            const fields = {};
+            for (const k of Object.keys(taskObj)) {
+                fields[k] = toFirestoreValue(taskObj[k]);
+            }
+            return { fields };
+        }
+
+        function firestoreDocToTask(doc) {
+            if (!doc || !doc.fields) return null;
+            const obj = {};
+            for (const k of Object.keys(doc.fields)) {
+                obj[k] = fromFirestoreValue(doc.fields[k]);
+            }
+            if (!Array.isArray(obj.subtasks)) obj.subtasks = [];
+            return obj;
+        }
+
+        async function fetchTasksViaRestFallback(showFeedback = false) {
+            const colName = getCollectionName();
+            const url = `${FIRESTORE_REST_BASE}/${colName}?key=${firebaseConfig.apiKey}&pageSize=300`;
             try {
-                await db.collection('tarefas').limit(1).get();
+                if (showFeedback) updateCloudStatusUI('syncing');
+                const resp = await fetch(url, { method: 'GET', cache: 'no-store' });
+                if (!resp.ok) {
+                    let errJson = {};
+                    try { errJson = await resp.json(); } catch (e) {}
+                    const errMsg = errJson.error?.message || `HTTP ${resp.status}`;
+                    const errStatus = errJson.error?.status || String(resp.status);
+                    updateCloudStatusUI('offline', formatFirebaseError({ code: errStatus, message: errMsg }));
+                    return false;
+                }
+                const data = await resp.json();
+                const docs = data.documents || [];
+                const cloudTasks = docs.map(firestoreDocToTask).filter(t => t && t.id);
+
+                if (cloudTasks.length === 0 && tasks.length > 0) {
+                    // Local has tasks while cloud is empty -> push local tasks to cloud so other users receive them!
+                    await syncLocalToCloud(true);
+                } else {
+                    applyCloudTasksList(cloudTasks);
+                }
                 updateCloudStatusUI('synced');
-                showToast('Conexão com o Firestore bem-sucedida!', 'success');
-                setupFirestoreRealtimeListener();
-            } catch (error) {
-                const msg = formatFirebaseError(error);
-                updateCloudStatusUI('offline', msg);
-                showToast('Falha na nuvem: verifique as regras do Firestore.', 'error');
+                return true;
+            } catch (err) {
+                if (!sdkRealtimeActive) {
+                    updateCloudStatusUI('offline', formatFirebaseError(err));
+                }
+                return false;
+            }
+        }
+
+        async function upsertTaskViaRest(taskObj) {
+            const colName = getCollectionName();
+            const url = `${FIRESTORE_REST_BASE}/${colName}/${encodeURIComponent(taskObj.id)}?key=${firebaseConfig.apiKey}`;
+            const body = JSON.stringify(taskToFirestoreDoc(taskObj));
+            const resp = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            if (!resp.ok) {
+                let errJson = {};
+                try { errJson = await resp.json(); } catch (e) {}
+                throw {
+                    code: errJson.error?.status || String(resp.status),
+                    message: errJson.error?.message || `HTTP ${resp.status}`
+                };
+            }
+            return true;
+        }
+
+        async function deleteTaskViaRest(taskId) {
+            const colName = getCollectionName();
+            const url = `${FIRESTORE_REST_BASE}/${colName}/${encodeURIComponent(taskId)}?key=${firebaseConfig.apiKey}`;
+            const resp = await fetch(url, { method: 'DELETE' });
+            if (!resp.ok && resp.status !== 404) {
+                throw new Error(`HTTP ${resp.status}`);
+            }
+            return true;
+        }
+
+        async function forceFullSyncNow() {
+            const icon = document.getElementById('forceSyncIcon');
+            if (icon) icon.classList.add('fa-spin');
+            const ok = await fetchTasksViaRestFallback(true);
+            if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+            if (ok) {
+                showToast(`Sincronizado com sucesso na Sala "${currentWorkspace.toUpperCase()}"!`, 'success');
+            } else {
+                showToast('Não foi possível sincronizar. Verifique o diagnóstico da nuvem.', 'error');
+                openFirebaseHelpModal();
             }
         }
 
         function copyFirestoreRules() {
-            const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /tarefas/{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
+            const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
             const tempArea = document.createElement('textarea');
             tempArea.value = rulesText;
             document.body.appendChild(tempArea);
             tempArea.select();
             document.execCommand('copy');
             document.body.removeChild(tempArea);
-            showToast('Regras copiadas para a área de transferência!', 'success');
+            showToast('Regras copiadas! Cole na aba Regras do Firestore e clique em Publicar.', 'success');
         }
 
         async function upsertTaskToCloud(taskObj) {
+            taskObj.updatedAt = Date.now();
             saveLocalCacheOnly();
-            if (!db) return;
+            updateCloudStatusUI('syncing');
+
+            let synced = false;
+            // 1. Try direct REST PATCH (reliable across all browsers and file://)
             try {
-                updateCloudStatusUI('syncing');
-                await db.collection('tarefas').doc(taskObj.id).set(taskObj);
+                await upsertTaskViaRest(taskObj);
+                synced = true;
                 updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Falha ao gravar no Firestore (mantido em localStorage):", e);
-                updateCloudStatusUI('offline', formatFirebaseError(e));
+            } catch (restErr) {
+                console.warn("Aviso REST upsert:", restErr);
+                // 2. Fallback to SDK if REST failed
+                if (db) {
+                    try {
+                        await db.collection(getCollectionName()).doc(taskObj.id).set(taskObj);
+                        synced = true;
+                        updateCloudStatusUI('synced');
+                    } catch (sdkErr) {
+                        updateCloudStatusUI('offline', formatFirebaseError(sdkErr));
+                    }
+                } else {
+                    updateCloudStatusUI('offline', formatFirebaseError(restErr));
+                }
             }
+            return synced;
         }
 
         async function removeTaskFromCloud(taskId) {
             saveLocalCacheOnly();
-            if (!db) return;
+            updateCloudStatusUI('syncing');
             try {
-                updateCloudStatusUI('syncing');
-                await db.collection('tarefas').doc(taskId).delete();
+                await deleteTaskViaRest(taskId);
                 updateCloudStatusUI('synced');
-            } catch (e) {
-                console.warn("Falha ao remover no Firestore:", e);
-                updateCloudStatusUI('offline', formatFirebaseError(e));
+            } catch (restErr) {
+                if (db) {
+                    try {
+                        await db.collection(getCollectionName()).doc(taskId).delete();
+                        updateCloudStatusUI('synced');
+                    } catch (sdkErr) {
+                        updateCloudStatusUI('offline', formatFirebaseError(sdkErr));
+                    }
+                }
             }
         }
 
         async function syncLocalToCloud(silent = false) {
-            if (!db) {
-                if (!silent) showToast('Firestore indisponível no momento.', 'error');
-                return;
-            }
+            updateCloudStatusUI('syncing');
             try {
-                updateCloudStatusUI('syncing');
-                const batch = db.batch();
-                tasks.forEach(t => {
-                    const ref = db.collection('tarefas').doc(t.id);
-                    batch.set(ref, t);
-                });
-                await batch.commit();
+                await Promise.all(tasks.map(t => upsertTaskViaRest(t)));
                 updateCloudStatusUI('synced');
-                if (!silent) showToast(`${tasks.length} tarefas sincronizadas com o Firebase Cloud!`, 'success');
+                if (!silent) showToast(`${tasks.length} tarefas enviadas para a Sala "${currentWorkspace.toUpperCase()}"!`, 'success');
             } catch (e) {
                 console.warn("Erro ao sincronizar lote com o Firestore:", e);
                 updateCloudStatusUI('offline', formatFirebaseError(e));
                 if (!silent) {
-                    showToast('Sem permissão no Firestore. Veja como ativar no modal.', 'error');
+                    showToast('Falha ao gravar na nuvem. Veja como ativar o Firestore no modal.', 'error');
                     openFirebaseHelpModal();
                 }
             }
@@ -855,30 +1078,29 @@ service cloud.firestore {
          **************************************************************/
         function initApp() {
             loadTheme();
-            loadTasksFromLocalCache();
+            loadTasksFromLocalCache(false);
             renderAll();
             initFirebase();
         }
 
-        function loadTasksFromLocalCache() {
+        function loadTasksFromLocalCache(fallbackToSamples = false) {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
+                const raw = localStorage.getItem(getStorageKey());
                 if (!raw) {
-                    tasks = generateSampleTasks();
-                    saveLocalCacheOnly();
+                    tasks = fallbackToSamples ? generateSampleTasks() : [];
                 } else {
                     const parsed = JSON.parse(raw);
-                    tasks = Array.isArray(parsed) && parsed.length > 0 ? parsed : generateSampleTasks();
+                    tasks = Array.isArray(parsed) ? parsed : [];
                 }
             } catch (e) {
                 console.error('Erro ao ler localStorage:', e);
-                tasks = generateSampleTasks();
+                tasks = [];
             }
         }
 
         function saveLocalCacheOnly() {
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+                localStorage.setItem(getStorageKey(), JSON.stringify(tasks));
             } catch (e) {
                 console.error('Erro ao guardar cache no navegador:', e);
             }
@@ -1122,6 +1344,11 @@ service cloud.firestore {
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${prio.badgeClass}">
                                     <i class="fa-solid ${prio.icon}"></i> ${prio.label}
                                 </span>
+                                ${task.author ? `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700" title="Responsável / Autor">
+                                    <i class="fa-solid fa-user text-[10px] text-indigo-500"></i> ${escapeHtml(task.author)}
+                                </span>
+                                ` : ''}
                             </div>
 
                             <!-- Edit & Delete Icons -->
@@ -1320,6 +1547,7 @@ service cloud.firestore {
                 modalTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-500"></i><span>Editar Tarefa</span>`;
                 document.getElementById('taskIdInput').value = task.id;
                 document.getElementById('taskTitleInput').value = task.title;
+                document.getElementById('taskAuthorInput').value = task.author || currentAuthor || '';
                 document.getElementById('taskDescInput').value = task.description || '';
                 document.getElementById('taskCategoryInput').value = task.category;
                 document.getElementById('taskPriorityInput').value = task.priority;
@@ -1329,6 +1557,7 @@ service cloud.firestore {
             } else {
                 modalTitle.innerHTML = `<i class="fa-solid fa-plus-circle text-indigo-500"></i><span>Nova Tarefa</span>`;
                 document.getElementById('taskIdInput').value = '';
+                document.getElementById('taskAuthorInput').value = currentAuthor || '';
                 document.getElementById('taskCategoryInput').value = currentCategory !== 'all' ? currentCategory : 'domestico';
                 document.getElementById('taskPriorityInput').value = 'media';
                 document.getElementById('taskDueDateInput').value = getLocalDateStr(0);
@@ -1400,6 +1629,7 @@ service cloud.firestore {
             event.preventDefault();
             const id = document.getElementById('taskIdInput').value;
             const title = document.getElementById('taskTitleInput').value.trim();
+            const author = document.getElementById('taskAuthorInput').value.trim();
             const description = document.getElementById('taskDescInput').value.trim();
             const category = document.getElementById('taskCategoryInput').value;
             const priority = document.getElementById('taskPriorityInput').value;
@@ -1407,6 +1637,11 @@ service cloud.firestore {
             const status = document.getElementById('taskStatusInput').value;
 
             if (!title) return;
+
+            if (author) {
+                currentAuthor = author;
+                localStorage.setItem(AUTHOR_KEY, currentAuthor);
+            }
 
             let targetTask = null;
 
@@ -1416,31 +1651,35 @@ service cloud.firestore {
                     tasks[idx] = {
                         ...tasks[idx],
                         title,
+                        author,
                         description,
                         category,
                         priority,
                         dueDate,
                         status,
+                        updatedAt: Date.now(),
                         subtasks: modalSubtasks
                     };
                     targetTask = tasks[idx];
-                    showToast('Tarefa atualizada!', 'success');
+                    showToast('Tarefa atualizada e enviada para a sala!', 'success');
                 }
             } else {
                 const newTask = {
-                    id: 'task-' + Date.now(),
+                    id: 'task-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
                     title,
+                    author,
                     description,
                     category,
                     priority,
                     dueDate,
                     status,
                     createdAt: Date.now(),
+                    updatedAt: Date.now(),
                     subtasks: modalSubtasks
                 };
                 tasks.unshift(newTask);
                 targetTask = newTask;
-                showToast('Nova tarefa criada!', 'success');
+                showToast('Nova tarefa compartilhada na sala!', 'success');
             }
 
             closeTaskModal();
@@ -1625,16 +1864,13 @@ service cloud.firestore {
             closeClearConfirmModal();
             renderAll();
 
-            if (db) {
-                try {
-                    const batch = db.batch();
-                    idsToRemove.forEach(id => batch.delete(db.collection('tarefas').doc(id)));
-                    await batch.commit();
-                } catch (e) {
-                    console.warn("Erro ao limpar coleção no Firestore:", e);
-                }
+            try {
+                await Promise.all(idsToRemove.map(id => deleteTaskViaRest(id)));
+                updateCloudStatusUI('synced');
+            } catch (e) {
+                console.warn("Erro ao limpar coleção no Firestore:", e);
             }
-            showToast('Todas as tarefas foram removidas.', 'info');
+            showToast('Todas as tarefas da sala foram removidas.', 'info');
         }
 
         /**************************************************************
